@@ -236,15 +236,24 @@ def filter(args, item):
   return item
 
 def main(args):
-  with args.input as f:
-    content = f.read()
   if args.disable:
-    return content
+    with args.input as f:
+      return f.read()
 
-  data = json.loads(content)
-
+  # Arrays of dicts representing JSON objects.
+  data = []
   output = []
-  for item in data:
+
+  for line in args.input:
+    if line.strip() == "": continue
+    data.append(json.loads(line))
+
+  for message in data:
+    if message["reason"] != "compiler-message":
+      output.append(message)
+      continue
+
+    item = message["message"]
     try:
       item = filter(args, item)
     except Exception as e:
@@ -252,17 +261,30 @@ def main(args):
         raise
       if item is not None:
         output.append({
-          "rendered": colorMeta("filter-rustc failed to process a message, showing the original:"),
+          "message": {
+            "rendered": colorMeta("filter-rustc failed to process a message, showing the original:"),
+          },
         })
 
     if item is None: continue
-    if item["rendered"] in [o["rendered"] for o in output]: continue
-    output.append(item)
+
+    duplicate = False
+    for o in output:
+      if "message" not in o: continue
+      if item["rendered"] == o["message"]["rendered"]:
+        duplicate = True
+        break
+    if duplicate: continue
+
+    message["message"] = item
+    output.append(message)
 
   if args.debug:
     pass
   else:
-    print(json.dumps(output, separators=(',', ':')))
+    # Output JSONL in the same format as the input was.
+    for message in output:
+      print(json.dumps(message, separators=(',', ':')))
 
 if __name__ == "__main__":
   import argparse
