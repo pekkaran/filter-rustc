@@ -1,15 +1,51 @@
-#!/bin/bash
-set -euo pipefail
+#!/usr/bin/env python3
 
-cargo_command=${1:-check} # Or "build", "run", "test", or even "clippy".
+import json
+import subprocess
 
-for prog in cargo jq filter-rustc.py; do
-  if ! type $prog > /dev/null 2>&1; then
-    echo "command not found: $prog"
-    exit 0
-  fi
-done
+def filterCargo(args, binaryArgs):
+  cmd = f"cargo {args.cargoCommand} --message-format=json-diagnostic-rendered-ansi"
+  if binaryArgs != "":
+    cmd += f" -- {binaryArgs}"
+  cmd += " | filter-rustc"
+  if args.debug: cmd += " --debug"
+  if args.disable: cmd += " --disable"
 
-cargo "$cargo_command" --message-format=json-diagnostic-rendered-ansi \
-  | filter-rustc.py \
-  | jq --raw-output 'select(.reason=="compiler-message") | .message.rendered'
+  if args.useJq:
+    cmd += " | jq --raw-output 'select(.reason==\"compiler-message\") | .message.rendered'"
+
+  out = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
+
+  # Print the "rendered" strings that will show up in color in terminal.
+  if args.useJq:
+    print(out)
+  else:
+    for line in out.splitlines():
+      obj = json.loads(line)
+      if obj["reason"] != "compiler-message": continue
+      print(obj["message"]["rendered"])
+
+if __name__ == "__main__":
+  import argparse
+  p = argparse.ArgumentParser(__doc__)
+  p.add_argument("cargoCommand", help="Eg 'run' to wrap 'cargo run'.")
+  p.add_argument("--useJq", action="store_true", help="Process the final output using `jq` as in the README.")
+  # These will be passed to filter-rustc, see its help.
+  p.add_argument("--debug", action="store_true")
+  p.add_argument("--disable", action="store_true")
+
+  args, argparseExtra = p.parse_known_args()
+
+  binaryArgs = ""
+  if args.cargoCommand == "run":
+    # If " -- " follows known arguments, then `argparseExtra` will not contain that token.
+    # If all the arguments are correct, you can even omit the " -- " when calling this script.
+    if "--" in argparseExtra:
+      raise Exception(f"Unknown argument {argparseExtra[0]}")
+
+    binaryArgsStarted = False
+    for s in argparseExtra:
+      if s != "": s += " "
+      binaryArgs += s
+
+  filterCargo(args, binaryArgs)

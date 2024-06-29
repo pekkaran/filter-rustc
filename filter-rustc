@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 #
-# Reduces Rust compiler warning verbosity where I find it detrimental.
-#
-# The usage of this script is unfortunately not very straightforward. You need to see
-# the `dotfiles/bin/ck` script in this repository to see how to invoke this and show the results.
-#
-# Development note to self:
-# * `cd` to the cargo workspace folder you are debugging, and run `ck check debug`.
-# * Modify this script to print something when `args.debug` is True.
-#   * You can start with `jqPrint(item)` and check modification results with `print(item["rendered"])`.
-# * Finally run `ck check` to see how your modifications changed the full filter output.
+# Possible development workflow:
+# TODO use filter-cargo, need to pass options
+# * `cd` to the cargo workspace folder you are debugging, and run `ck check debug` (should print nothing).
+# * Modify this script to eg `jqPrint(item)` the warning/error you are interested in.
+# * Run `ck check` to see how your modifications changed the full filter output.
 
 import json
 import re
@@ -235,7 +230,7 @@ def filter(args, item):
 
   return item
 
-def main(args):
+def filterRustc(args):
   if args.disable:
     with args.input as f:
       return f.read()
@@ -298,4 +293,4 @@ if __name__ == "__main__":
   p.add_argument("--debug", action="store_true", help="Do not print rendered output and enable other debugging helpers")
   p.add_argument("--disable", action="store_true", help="Show the compiler output without any filtering")
   args = p.parse_args()
-  main(args)
+  filterRustc(args)

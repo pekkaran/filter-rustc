@@ -2,9 +2,9 @@
 
 *tl;dr* More concise `rustc` output for intermediate and advanced developers.
 
-If you use Rust's `cargo build` from the command-line then you are probably aware that the warnings and errors, while helpful for newcomers, can be **very verbose**. A simple unused variable warning is 7 lines long and some rather straightforward errors can number in the dozens lines. This can make it difficult to spot the main error in your code or the output may become cluttered with warnings you don't intend to fix immediately.
+If you use Rust's `cargo build` from the command-line then you are probably aware that the warnings and errors, while helpful for newcomers, can be **very verbose**. A simple unused variable warning is 7 lines long and some rather straightforward errors can number in the dozens lines. This can make it difficult to quickly find the spot you need to fix in your code.
 
-The `cargo` tool has the option `--message-format short` which turns **every** warning and error into **one line**, and as this is 100% guaranteed to work, it may very well be the fix you are looking for.
+Rust's `cargo` tool has the option `--message-format short` which turns **every** warning and error into **one line**, and as this is 100% guaranteed to work, it may very well be the fix you are looking for.
 
 This project provides an alternative in a single script that modifies the verbose default `rustc` output in an opinionated manner, one warning at a time.
 
@@ -25,27 +25,28 @@ cargo check --message-format=json-diagnostic-rendered-ansi | jq --raw-output 'se
 The tool in this project functions by filtering the JSONL in the middle of the pipeline like this:
 
 ```sh
-cargo check --message-format=json-diagnostic-rendered-ansi | filter-rustc.py | jq --raw-output 'select(.reason=="compiler-message") | .message.rendered'
+cargo check --message-format=json-diagnostic-rendered-ansi | filter-rustc | jq --raw-output 'select(.reason=="compiler-message") | .message.rendered'
 ```
 
-Since that is quite a handful, there is a helper script which does the same with `filter-cargo check`.
+That is quite awkward to type so there is a helper script that accomplishes the same with `filter-cargo check`. This also avoids the `jq` dependency.
 
 ## Detailed setup
 
 Developed and tested only on Linux.
 
-Install [Rust](https://www.rust-lang.org/tools/install) and [jq](https://jqlang.github.io/jq/). Run:
+Install [Rust](https://www.rust-lang.org/tools/install). Then run:
 
 ```sh
 git clone https://github.com/pekkaran/filter-rustc.git
 cd filter-rustc
-chmod +x filter_rustc.py filter-cargo
+chmod +x filter-rustc filter-cargo
 ```
 
-Add eg in your `.bashrc`: `PATH="$PATH:/path/to/filter-rustc"`
+Add eg in your `.bashrc`: `PATH="$PATH:/path/to/filter-rustc"` and open a new terminal.
 
-Open a new terminal and test with (after intentionally making your code not compile):
+For example if you normally run your program as `cargo run -- --enigmaticNumber 23`, then the replacement you need is:
+
 ```sh
 cd my-rust-project
-filter-cargo run
+filter-cargo run -- --enigmaticNumber 23
 ```
