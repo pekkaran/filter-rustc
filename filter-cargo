@@ -3,7 +3,7 @@ set -euo pipefail
 
 cargo_command=${1:-check} # Or "build", "run", "test", or even "clippy".
 
-for prog in cargo jq sed; do
+for prog in cargo jq filter-rustc.py; do
   if ! type $prog > /dev/null 2>&1; then
     echo "command not found: $prog"
     exit 0
