@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+
+cargo_command=${1:-check} # Or "build", "run", "test", or even "clippy".
+
+for prog in cargo jq sed; do
+  if ! type $prog > /dev/null 2>&1; then
+    echo "command not found: $prog"
+    exit 0
+  fi
+done
+
+cargo "$cargo_command" --message-format=json-diagnostic-rendered-ansi \
+  | filter-rustc.py \
+  | jq --raw-output 'select(.reason=="compiler-message") | .message.rendered'
