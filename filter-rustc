@@ -74,15 +74,25 @@ def getCodeLocations(item):
       s += f":{line}"
   return s
 
-def render(item, locations, message):
+def render(item, locations, message, suggestions=""):
+  multiline = len(locations) > 70 or len(message) + len(locations) > 120
+  if suggestions: multiline = True
+  if "\n" in message: multiline = True
+
   if item["level"] == "error": s = colorError(locations)
   else: s = colorWarning(locations)
-  s += f": {message}"
+
+  if multiline: s += f":\n  {message}"
+  else: s += f": {message}"
+
+  if suggestions: s += f"\n  {suggestions}"
+  if multiline: s += "\n"
   item["rendered"] = s
 
 # Generic compression that shows the plain "message" field.
 def compress(item, compressTypes=True):
   locations = getCodeLocations(item)
+
   s = "{}".format(item["message"])
   if compressTypes:
     s = s.replace("interner::_::_serde::Deserialize<'_>", "Deserialize")
@@ -91,9 +101,14 @@ def compress(item, compressTypes=True):
     s = s.replace("std::cmp::PartialEq", "PartialEq")
     s = s.replace("std::hash::Hash", "Hash")
 
-  if len(s) > 100: s += "\n"
-  replaceRendered(item, s, item["level"] == "error")
-  render(item, locations, s)
+  suggestions = ""
+  for child in item["children"]:
+    for span in child["spans"]:
+      if not "suggested_replacement" in span: continue
+      suggestions += "Did you mean: "
+      suggestions += colorSuggestion(span["suggested_replacement"])
+
+  render(item, locations, s, suggestions)
 
 def filterMismatchedTypes(item):
   if len(item["spans"]) == 0: return
@@ -117,7 +132,6 @@ def filterWrongNumberOfArguments(item):
   for span in child["spans"]:
     if span["label"] is None: continue
     s += "\n    " + span["text"][0]["text"].strip()
-  s += "\n"
   render(item, locations, s)
 
 def filterValueTypo(item):
@@ -168,25 +182,19 @@ def filter(args, item):
     try: codeNum = int(codeStr[1:])
     except: pass
 
-  # TODO Testing if this is always true.
-  assert("spans" in item)
-  assert("children" in item)
-
-  if m.startswith("cannot find value"):
-    filterValueTypo(item)
-
-  # NoSuchEnumVariant. TODO Multiple errors use this same code? Need to make the condition more specific.
-  # if codeNum == 599:
-  #   compress(item)
-
   # Generic one-line compression.
   for filterCode, subStrings in [
     (4, ["non-exhaustive patterns"]),
+    (27, ["pattern does not mention field"]),
+    (61, ["this method takes"]), # "… n argument(s) but m was/were supplied"
     (63, ["missing field"]),
     (412, ["cannot find type"]),
     (384, ["cannot assign twice to immutable variable"]),
     (609, ["no field", "on type"]),
+    (599, ["no variant or associated item named"]),
+    (599, ["no method named"]),
     ("unused_variables", []),
+    ("unused_imports", []),
     ("dead_code", []),
   ]:
     if isinstance(filterCode, int) and codeNum != filterCode: continue
