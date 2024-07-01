@@ -30,11 +30,6 @@ def jqPrint(j):
     out = subprocess.check_output(f"cat {tempFile.name} | jq -C .", shell=True).decode('utf-8').strip()
   print(out)
 
-# Print the error as it will show in the rustc output.
-def print_rustc_rendered(item):
-  if not "rendered" in item: return
-  print(item["rendered"])
-
 def readJson(filePath):
   with open(filePath) as f:
     return json.load(f)
@@ -45,10 +40,23 @@ def colorSuggestion(s): return "\x1b[32m" + s + "\x1b[0m"
 def colorError(s):      return "\x1b[31m" + s + "\x1b[0m"
 def colorMeta(s):       return "\x1b[37m" + s + "\x1b[0m"
 
-def printWarning(item):
-  item = item.copy()
-  del item["rendered"]
-  print(json.dumps(item, indent=4))
+COLOR_CODE = 35
+
+def colorBetweenBackticks(s):
+  out = ""
+  n = 0
+  for c in s:
+    if c == "`":
+      if n % 2 == 0:
+        out += f"\x1b[{COLOR_CODE}m"
+      else:
+        out += f"\x1b[0m"
+      n += 1
+    else:
+      out += c
+  if n % 2 == 0:
+    return out
+  return s
 
 def replaceRendered(item, s, error=False):
   if error: item["rendered"] = colorError(s)
@@ -82,6 +90,7 @@ def render(item, locations, message, suggestions=""):
   if item["level"] == "error": s = colorError(locations)
   else: s = colorWarning(locations)
 
+  message = colorBetweenBackticks(message)
   if multiline: s += f":\n  {message}"
   else: s += f": {message}"
 
@@ -131,7 +140,7 @@ def filterWrongNumberOfArguments(item):
   child = item["children"][0];
   for span in child["spans"]:
     if span["label"] is None: continue
-    s += "\n    " + span["text"][0]["text"].strip()
+    s += colorSuggestion("\n    " + span["text"][0]["text"].strip())
   render(item, locations, s)
 
 def filterValueTypo(item):
@@ -189,6 +198,7 @@ def filter(args, item):
     (61, ["this method takes"]), # "… n argument(s) but m was/were supplied"
     (63, ["missing field"]),
     (412, ["cannot find type"]),
+    (425, ["cannot find function"]),
     (384, ["cannot assign twice to immutable variable"]),
     (609, ["no field", "on type"]),
     (599, ["no variant or associated item named"]),
@@ -230,11 +240,12 @@ def filter(args, item):
   match = RE_ERROR_EXPLANATIONS.match(m)
   if match:
     tokens = match.group(1).split(",")
-    s = "Help: "
+    s = colorMeta("Help")
+    s += ": "
     for i, token in enumerate(tokens):
       if i > 0: s += "; "
       s += f"rustc --explain {token.strip()}"
-    replaceRendered(item, s)
+    item["rendered"] = s
 
   return item
 
