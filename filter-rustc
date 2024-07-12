@@ -35,10 +35,10 @@ def readJson(filePath):
     return json.load(f)
 
 # One nice reference: <https://stackoverflow.com/a/21786287>
-def colorWarning(s):    return "\x1b[33m" + s + "\x1b[0m"
-def colorSuggestion(s): return "\x1b[32m" + s + "\x1b[0m"
-def colorError(s):      return "\x1b[31m" + s + "\x1b[0m"
-def colorMeta(s):       return "\x1b[37m" + s + "\x1b[0m"
+def colorWarning(s):    return f"\x1b[33m{str(s)}\x1b[0m"
+def colorSuggestion(s): return f"\x1b[32m{str(s)}\x1b[0m"
+def colorError(s):      return f"\x1b[31m{str(s)}\x1b[0m"
+def colorMeta(s):       return f"\x1b[37m{str(s)}\x1b[0m"
 
 COLOR_CODE = 35
 
@@ -113,7 +113,8 @@ def compress(item, compressTypes=True):
   suggestions = ""
   for child in item["children"]:
     for span in child["spans"]:
-      if not "suggested_replacement" in span: continue
+      if not "suggested_replacement" in span or span["suggested_replacement"] is None:
+        continue
       suggestions += "Did you mean: "
       suggestions += colorSuggestion(span["suggested_replacement"])
 
