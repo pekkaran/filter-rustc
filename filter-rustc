@@ -99,7 +99,7 @@ def render(item, locations, message, suggestions=""):
   item["rendered"] = s
 
 # Generic compression that shows the plain "message" field.
-def compress(item, compressTypes=True):
+def compress(item, compressTypes=True, suggestions=True):
   locations = getCodeLocations(item)
 
   s = "{}".format(item["message"])
@@ -110,15 +110,16 @@ def compress(item, compressTypes=True):
     s = s.replace("std::cmp::PartialEq", "PartialEq")
     s = s.replace("std::hash::Hash", "Hash")
 
-  suggestions = ""
-  for child in item["children"]:
-    for span in child["spans"]:
-      if not "suggested_replacement" in span or span["suggested_replacement"] is None:
-        continue
-      suggestions += "Did you mean: "
-      suggestions += colorSuggestion(span["suggested_replacement"])
+  suggestionStr = ""
+  if suggestions:
+    for child in item["children"]:
+      for span in child["spans"]:
+        if not "suggested_replacement" in span or span["suggested_replacement"] is None:
+          continue
+        suggestionStr += "Did you mean: "
+        suggestionStr += colorSuggestion(span["suggested_replacement"])
 
-  render(item, locations, s, suggestions)
+  render(item, locations, s, suggestionStr)
 
 def filterMismatchedTypes(item):
   if len(item["spans"]) == 0: return
@@ -192,27 +193,29 @@ def filter(args, item):
     try: codeNum = int(codeStr[1:])
     except: pass
 
-  # Generic one-line compression.
-  for filterCode, subStrings in [
-    (4, ["non-exhaustive patterns"]),
-    (27, ["pattern does not mention field"]),
-    (61, ["this method takes"]), # "… n argument(s) but m was/were supplied"
-    (63, ["missing field"]),
-    (412, ["cannot find type"]),
-    (425, ["cannot find function"]),
-    (384, ["cannot assign twice to immutable variable"]),
-    (609, ["no field", "on type"]),
-    (599, ["no variant or associated item named"]),
-    (599, ["no method named"]),
-    ("unused_variables", []),
-    ("unused_imports", []),
-    ("dead_code", []),
+  # Generic compression.
+  for case in [
+      { "code": 4, "subStrings": ["non-exhaustive patterns"], "suggestions": False },
+      { "code": 27, "subStrings": ["pattern does not mention field"] },
+      { "code": 61, "subStrings": ["this method takes"] },
+      { "code": 63, "subStrings": ["missing field"] },
+      { "code": 412, "subStrings": ["cannot find type"] },
+      { "code": 425, "subStrings": ["cannot find function"] },
+      { "code": 384, "subStrings": ["cannot assign twice to immutable variable"] },
+      { "code": 609, "subStrings": ["no field", "on type"] },
+      { "code": 599, "subStrings": ["no variant or associated item named"] },
+      { "code": 599, "subStrings": ["no method named"] },
+      { "code": "unused_variables" },
+      { "code": "unused_imports" },
+      { "code": "dead_code" },
   ]:
-    if isinstance(filterCode, int) and codeNum != filterCode: continue
-    if isinstance(filterCode, str) and codeStr != filterCode: continue
-    if not all([s in m for s in subStrings]): continue
-    compress(item)
+    if isinstance(case["code"], int) and codeNum != case["code"]: continue
+    if isinstance(case["code"], str) and codeStr != case["code"]: continue
+    if "subStrings" in case and not all([s in m for s in case["subStrings"]]): continue
+    suggestions = case["suggestions"] if "suggestions" in case else True
+    compress(item, compressTypes=True, suggestions=suggestions)
 
+  # Specialized compression functions.
   if codeNum == 61 and m.startswith("this function takes"):
     filterWrongNumberOfArguments(item)
 
