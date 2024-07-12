@@ -94,31 +94,59 @@ def render(item, locations, message, suggestions=""):
   if multiline: s += f":\n  {message}"
   else: s += f": {message}"
 
-  if suggestions: s += f"\n  {suggestions}"
+  if suggestions:
+    suggestions = suggestions.replace("\n", "\n    ")
+    s += f"\n  {suggestions}"
   if multiline: s += "\n"
   item["rendered"] = s
 
+def compressTypes(s):
+  s = s.replace("interner::_::_serde::Deserialize<'_>", "Deserialize")
+  s = s.replace("interner::_::_serde::Serialize", "Serialize")
+  s = s.replace("std::hash::Hash", "Hash")
+  s = s.replace("std::fmt::Debug", "Debug")
+  s = s.replace("std::fmt::Display", "Display")
+  s = s.replace("std::result::Result", "Result")
+  s = s.replace("std::cmp::", "")
+  s = s.replace("std::marker::", "")
+  s = s.replace("std::collections::", "")
+  return s
+
 # Generic compression that shows the plain "message" field.
-def compress(item, compressTypes=True, suggestions=True):
+def compress(item, suggestions=True, showNotes=False, showHelp=False):
   locations = getCodeLocations(item)
 
   s = "{}".format(item["message"])
-  if compressTypes:
-    s = s.replace("interner::_::_serde::Deserialize<'_>", "Deserialize")
-    s = s.replace("interner::_::_serde::Serialize", "Serialize")
-    s = s.replace("std::cmp::Eq", "Eq")
-    s = s.replace("std::cmp::PartialEq", "PartialEq")
-    s = s.replace("std::hash::Hash", "Hash")
+  s = compressTypes(s)
 
+  # These are the green outputs that show exactly what your code is missing. Very compact.
   suggestionStr = ""
   if suggestions:
     for child in item["children"]:
       for span in child["spans"]:
         if not "suggested_replacement" in span or span["suggested_replacement"] is None:
           continue
-        suggestionStr += "Did you mean: "
-        suggestionStr += colorSuggestion(span["suggested_replacement"])
+        x = span["suggested_replacement"].strip()
+        if not x: continue
+        if suggestionStr: suggestionStr += "\n"
+        else: suggestionStr = "Did you mean:  "
+        suggestionStr += f"{colorSuggestion(x)}"
 
+  # This are more verbose hints from the compiler that begin with "note:" or "help:".
+  # Some should be printed for less common/non-trivial errors.
+  for extra in [ (showNotes, "note"), (showHelp, "help") ]:
+    if not extra[0]: continue
+    extraStr = ""
+    for child in item["children"]:
+      if child["level"] != extra[1]: continue
+      if extraStr: extraStr += "\n"
+      else: extraStr = f"{extra[1]}:  "
+      extraStr += child["message"]
+    if extraStr:
+      if suggestionStr: suggestionStr += "\n"
+      suggestionStr += extraStr
+
+  suggestionStr = compressTypes(suggestionStr)
   render(item, locations, s, suggestionStr)
 
 def filterMismatchedTypes(item):
@@ -197,30 +225,83 @@ def filter(args, item):
   for case in [
       { "code": 4, "subStrings": ["non-exhaustive patterns"], "suggestions": False },
       { "code": 27, "subStrings": ["pattern does not mention field"] },
+      { "code": 46, "subStrings": ["not all trait items implemented"] },
+      { "code": 53, "subStrings": ["incompatible type for trait"] },
       { "code": 61, "subStrings": ["this method takes"] },
       { "code": 63, "subStrings": ["missing field"] },
-      { "code": 412, "subStrings": ["cannot find type"] },
-      { "code": 425, "subStrings": ["cannot find function"] },
+      { "code": 106, "subStrings": ["missing lifetime specifier"] },
+      { "code": 107, "subStrings": ["missing generics for struct"] },
+      { "code": 133, "subStrings": ["call to unsafe function"] },
+      { "code": 261, "subStrings": ["use of undeclared lifetime"] },
+      { "code": 267, "subStrings": ["`break` inside of a closure"] },
+      { "code": 277, "subStrings": ["the trait bound", "is not satisfied"] },
+      { "code": 277, "subStrings": ["doesn't implement"] },
+      { "code": 277, "subStrings": ["can't compare"] },
+      { "code": 277, "subStrings": ["cannot be indexed by"] },
+      { "code": 277, "subStrings": ["is not an iterator"], "showNotes": True },
+      {
+        "code": 277,
+        "subStrings": ["the size for values of type", "cannot be known at compilation time"],
+        "showNotes": True,
+      },
+      { "code": 369, "subStrings": ["cannot add", "to"] },
+      { "code": 373, "subStrings": ["closure may outlive the current function"] },
       { "code": 384, "subStrings": ["cannot assign twice to immutable variable"] },
+      { "code": 405, "subStrings": ["cannot find trait"] },
+      { "code": 412, "subStrings": ["cannot find type"] },
+      { "code": 416, "subStrings": ["identifier", "is bound more than once in the same pattern"] },
+      { "code": 422, "subStrings": ["cannot find struct, variant or union type"] },
+      { "code": 425, "subStrings": ["cannot find function"] },
+      { "code": 425, "subStrings": ["cannot find value"] },
+      { "code": 432, "subStrings": ["unresolved import" ] },
+      { "code": 433, "subStrings": ["failed to resolve: use of undeclared type" ] },
+      { "code": 433, "subStrings": ["failed to resolve: could not find"] },
+      { "code": 531, "subStrings": ["cannot find tuple struct or tuple variant"] },
+      { "code": 593, "subStrings": ["closure is expected to take", "but it takes"] },
+      { "code": 594, "subStrings": ["cannot assign", "is not declared as mutable"] },
+      { "code": 599, "subStrings": ["no function or associated item named"], "showNotes": True },
+      { "code": 603, "subStrings": ["module", "is private"] },
       { "code": 609, "subStrings": ["no field", "on type"] },
+      { "code": 616, "subStrings": ["is private"] },
+      { "code": 624, "subStrings": ["is private"] },
+      { "code": 560, "subStrings": ["has no field named"] },
+      { "code": 596, "subStrings": ["cannot borrow"] },
       { "code": 599, "subStrings": ["no variant or associated item named"] },
       { "code": 599, "subStrings": ["no method named"] },
+      { "code": 700, "subStrings": ["captures lifetime that does not appear in bounds"], "showHelp": True },
+      { "code": 758, "subStrings": ["unterminated block comment"] },
       { "code": "unused_variables" },
       { "code": "unused_imports" },
       { "code": "dead_code" },
+      { "message": "unexpected closing delimiter" },
+      { "message": "mismatched closing delimiter" },
+      { "message": "this file contains an unclosed delimiter" },
+      { "message": "cannot find macro" },
+      { "message": "cannot find derive macro" },
+      { "message": "no default declared" },
+      { "message": "missing type for `const` item" },
+      { "message": "missing `struct` for struct definition" },
+      { "message": "unexpected end of macro invocation" },
+      { "message": "unused `std::result::Result` that must be used" },
+      { "message": "expected one of" },
+      { "message": "cannot find attribute" },
+      { "message": "expected identifier" },
+      { "message": "No such file or directory" },
+      { "message": "variable does not need to be mutable" },
   ]:
-    if isinstance(case["code"], int) and codeNum != case["code"]: continue
-    if isinstance(case["code"], str) and codeStr != case["code"]: continue
+    if "code" in case:
+      if isinstance(case["code"], int) and codeNum != case["code"]: continue
+      if isinstance(case["code"], str) and codeStr != case["code"]: continue
+    if "message" in case and case["message"] not in m: continue
     if "subStrings" in case and not all([s in m for s in case["subStrings"]]): continue
     suggestions = case["suggestions"] if "suggestions" in case else True
-    compress(item, compressTypes=True, suggestions=suggestions)
+    showNotes = case["showNotes"] if "showNotes" in case else False
+    showHelp = case["showHelp"] if "showHelp" in case else False
+    compress(item, suggestions=suggestions, showNotes=showNotes, showHelp=showHelp)
 
   # Specialized compression functions.
   if codeNum == 61 and m.startswith("this function takes"):
     filterWrongNumberOfArguments(item)
-
-  if codeNum == 277 and "the trait bound" in m and "is not satisfied" in m:
-    compress(item, compressTypes=True)
 
   if codeNum == 308 and "mismatched types" in m:
     filterMismatchedTypes(item)
@@ -262,6 +343,8 @@ def filterRustc(args):
   data = []
   output = []
 
+  # Maybe does not work yet. The intention is to allow printing of
+  # eg `cargo test` output when there are no compiler errors.
   passthroughMode = False
   for line in args.input:
     if line.strip() == "": continue
