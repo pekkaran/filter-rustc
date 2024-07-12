@@ -288,6 +288,7 @@ def filterRustc(args):
         raise
       if item is not None:
         output.append({
+          "reason": "compiler-message",
           "message": {
             "rendered": colorMeta("filter-rustc failed to process a message, showing the original:"),
           },
