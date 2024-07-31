@@ -277,7 +277,9 @@ def filter(args, item):
       { "code": 726, "subStrings": ["implicit elided lifetime not allowed here"] },
       { "code": 758, "subStrings": ["unterminated block comment"] },
       { "code": "unused_variables", "suggestions": False },
+      { "code": "unused_assignments" },
       { "code": "unused_imports" },
+      { "code": "unreachable_code" },
       { "code": "dead_code" },
       { "message": "unexpected closing delimiter" },
       { "message": "mismatched closing delimiter" },
@@ -295,6 +297,7 @@ def filter(args, item):
       { "message": "No such file or directory" },
       { "message": "variable does not need to be mutable" },
       { "message": "struct literal body without path" },
+      { "message": "format argument must be a string literal" },
   ]:
     if "code" in case:
       if isinstance(case["code"], int) and codeNum != case["code"]: continue
