@@ -247,12 +247,14 @@ def filter(args, item):
       },
       { "code": 308, "subStrings": ["arguments to this method are incorrect"] },
       { "code": 369, "subStrings": ["cannot add", "to"] },
+      { "code": 369, "subStrings": ["binary operation", "cannot be applied to type"] },
       { "code": 373, "subStrings": ["closure may outlive the current function"] },
       { "code": 384, "subStrings": ["cannot assign twice to immutable variable"] },
       { "code": 405, "subStrings": ["cannot find trait"] },
       { "code": 412, "subStrings": ["cannot find type"] },
       { "code": 416, "subStrings": ["identifier", "is bound more than once in the same pattern"] },
       { "code": 422, "subStrings": ["cannot find struct, variant or union type"] },
+      { "code": 423, "subStrings": ["expected function, tuple struct or tuple variant"] },
       { "code": 425, "subStrings": ["cannot find function"] },
       { "code": 425, "subStrings": ["cannot find value"] },
       { "code": 432, "subStrings": ["unresolved import" ] },
@@ -264,6 +266,8 @@ def filter(args, item):
       { "code": 593, "subStrings": ["closure is expected to take", "but it takes"] },
       { "code": 594, "subStrings": ["cannot assign", "is not declared as mutable"] },
       { "code": 599, "subStrings": ["no function or associated item named"], "showNotes": True },
+      { "code": 599, "subStrings": ["no variant named"] },
+      { "code": 600, "subStrings": ["cannot apply unary operator"] },
       { "code": 603, "subStrings": ["module", "is private"] },
       { "code": 609, "subStrings": ["no field", "on type"] },
       { "code": 616, "subStrings": ["is private"] },
@@ -298,6 +302,7 @@ def filter(args, item):
       { "message": "variable does not need to be mutable" },
       { "message": "struct literal body without path" },
       { "message": "format argument must be a string literal" },
+      { "message": "that must be used" },
   ]:
     if "code" in case:
       if isinstance(case["code"], int) and codeNum != case["code"]: continue
